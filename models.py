@@ -25,15 +25,15 @@ class Result(db.Model):
         self.raw_result_all = json.dumps(self._result_all)
 
     @property
-    def result_all(self):
-        if self.raw_result_all:
-            self._result_all = json.loads(self.raw_result_all)
-        return self._result_all
+    def result_no_stop_words(self):
+        if self.raw_result_no_stop_words:
+            self._result_no_stop_words = json.loads(self.raw_result_no_stop_words)
+        return self._result_no_stop_words
 
-    @result_all.setter
-    def result_all(self, data):
-        self._result_all = data
-        self.raw_result_all = json.dumps(self._result_all)
+    @result_no_stop_words.setter
+    def result_no_stop_words(self, data):
+        self._result_no_stop_words = data
+        self.raw_result_no_stop_words = json.dumps(self._result_no_stop_words)
 
     def __init__(self, url, result_all, result_no_stop_words):
         self.url = url

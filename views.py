@@ -12,8 +12,12 @@ from flask import (
 from app import (
     app,
     db,
+    q,
 )
 from models import Result
+from rq.job import Job
+from worker import conn
+from flask import jsonify
 
 
 @app.route('/', methods=['GET'])
@@ -25,13 +29,37 @@ def index():
 def process():
     try:
         url = request.form['url']
-        resp = requests.get(url)
+        job = q.enqueue_call(
+            func=count_and_save_words,
+            args=(url,),
+            result_ttl=5000
+        )
+        print(job.get_id())
     except Exception as e:
-        msg = """
-        Unable to get URL(%s). Please make sure it's valid and try again.
-        """ % url
+        msg = "URL missing"
         return render_template('index.html', errors=[msg])
+    return render_template('index.html')
 
+
+@app.route("/results/<job_key>", methods=['GET'])
+def get_results(job_key):
+
+    job = Job.fetch(job_key, connection=conn)
+
+    if job.is_finished:
+        result = Result.query.filter_by(id=job.result).first()
+        results = sorted(
+            result.result_no_stop_words.items(),
+            key=operator.itemgetter(1),
+            reverse=True
+        )[:30]
+
+        return jsonify(results), 200
+    return "Nay!", 202
+
+
+def count_and_save_words(url):
+    resp = requests.get(url)
     if not resp:
         return render_template('index.html')
 
@@ -52,12 +80,6 @@ def process():
     no_stop_words_count = Counter(no_stop_words)
 
     # save the results
-    results = sorted(
-        no_stop_words_count.items(),
-        key=operator.itemgetter(1),
-        reverse=True
-    )[:30]
-
     try:
         result = Result(
             url=url,
@@ -66,11 +88,11 @@ def process():
         )
         db.session.add(result)
         db.session.commit()
+        return result.id
     except Exception as e:
         print e
         errors.append("Unable to add item to database.")
-
-    return render_template('index.html', errors=errors, results=results)
+        return {"error": errors}
 
 
 @app.route('/<name>')
