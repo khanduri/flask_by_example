@@ -18,27 +18,23 @@ from models import Result
 from rq.job import Job
 from worker import conn
 from flask import jsonify
+import json
 
 
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET', 'POST'])
 def index():
     return render_template('index.html')
 
 
-@app.route('/', methods=['POST'])
+@app.route('/start', methods=['POST'])
 def process():
-    try:
-        url = request.form['url']
-        job = q.enqueue_call(
-            func=count_and_save_words,
-            args=(url,),
-            result_ttl=5000
-        )
-        print(job.get_id())
-    except Exception as e:
-        msg = "URL missing"
-        return render_template('index.html', errors=[msg])
-    return render_template('index.html')
+    url = json.loads(request.data.decode())['url']
+    job = q.enqueue_call(
+        func=count_and_save_words,
+        args=(url,),
+        result_ttl=5000
+    )
+    return job.get_id()
 
 
 @app.route("/results/<job_key>", methods=['GET'])
